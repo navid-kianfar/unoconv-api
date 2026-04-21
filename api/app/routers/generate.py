@@ -190,7 +190,7 @@ async def generate_thumbnail(
             elif path and os.path.exists(path):
                 try:
                     os.remove(path)
-                except:
+                except Exception:
                     pass
 
 
@@ -320,7 +320,7 @@ async def convert_file(
             if path and os.path.exists(path):
                 try:
                     os.remove(path)
-                except:
+                except Exception:
                     pass
 
 

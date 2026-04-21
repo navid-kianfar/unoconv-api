@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 from enum import Enum
+import aiofiles
 
 
 class ThumbnailType(str, Enum):
