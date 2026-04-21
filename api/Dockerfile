@@ -8,13 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ffmpeg \
     imagemagick \
-    libreoffice \
-    unoconv \
-    librecad \
+    libreoffice-writer \
+    libreoffice-calc \
+    libreoffice-impress \
     graphicsmagick \
     poppler-utils \
     ghostscript \
     locales \
+    git \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -25,12 +26,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN pip install --no-cache-dir unoconv
+
 COPY . .
 
 ENV TEMP_DIR=/tmp/thumbnails
 RUN mkdir -p $TEMP_DIR
-
-ENV API_KEY=
 
 EXPOSE 8000
 
