@@ -7,7 +7,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: khafar/unoconv-api
+  IMAGE_NAME: kananfar/unoconv-api
 
 jobs:
   release:
