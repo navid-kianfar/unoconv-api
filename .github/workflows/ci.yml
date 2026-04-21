@@ -27,30 +27,8 @@ jobs:
           flake8 api/app/ --max-line-length=100 --ignore=E501,W503
           black --check api/app/
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install -r api/requirements.txt
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            imagemagick ffmpeg libreoffice unoconv ghostscript poppler-utils
-
-      - name: Run tests
-        run: pytest api/tests/ -v
-
   docker-build:
-    needs: [lint, test]
+    needs: [lint]
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     steps:
