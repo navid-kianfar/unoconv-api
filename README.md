@@ -7,6 +7,7 @@ A REST API for generating thumbnails and converting files between formats using 
 - Convert files between formats (DOCX→PDF, XLSX→PDF, etc.)
 - Input/Output from local files, S3, FTP, or direct upload
 - Docker multi-arch support (amd64 & arm64)
+- Background worker with RabbitMQ queue support
 
 ## Quick Start
 
@@ -294,6 +295,103 @@ FTP_PASSWORD=pass
 docker buildx create --name mybuilder --use
 docker buildx build --platform linux/amd64,linux/arm64 \
   -t thumbnail-api:latest --push .
+```
+
+---
+
+## Background Worker
+
+The API supports async processing via a RabbitMQ worker.
+
+### Architecture
+
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│   Client    │────▶│  RabbitMQ    │────▶│   Worker Node   │
+│  (Submit)   │     │   Queue      │     │  (Process Job)  │
+└─────────────┘     └──────────────┘     └─────────────────┘
+```
+
+### Run with Docker Compose
+
+```bash
+# Start API + Worker + RabbitMQ
+docker-compose -f docker-compose.worker.yml up -d
+
+# Or just start worker
+docker-compose -f docker-compose.worker.yml up -d unoconv-worker
+```
+
+### Environment Variables (Worker)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RABBITMQ_URL` | amqp://localhost:5672 | RabbitMQ connection |
+| `QUEUE_NAME` | unoconv-jobs | Job queue name |
+| `MAX_CONCURRENT` | 2 | Max parallel jobs |
+| `JOB_TIMEOUT` | 300 | Job timeout (seconds) |
+
+### Submit Jobs via Client
+
+```python
+from worker import QueueClient
+import asyncio
+
+async def submit():
+    client = QueueClient(rabbitmq_url="amqp://localhost:5672")
+    
+    # Submit thumbnail job
+    await client.submit_thumbnail(
+        source={"type": "s3", "path": "bucket/docs/file.pdf"},
+        output={"type": "s3", "path": "bucket/thumbs/out.png"},
+        options={"width": 300, "height": 300},
+        webhook_url="https://myapp.com/webhook"  # optional
+    )
+    
+    # Submit conversion job
+    await client.submit_convert(
+        source={"type": "file", "path": "/data/doc.docx"},
+        output={"type": "stream"},
+        options={"output_format": "pdf"}
+    )
+    
+    await client.disconnect()
+
+asyncio.run(submit())
+```
+
+### CLI Client
+
+```bash
+# Submit thumbnail job
+python -m worker.client \
+  --type thumbnail \
+  --source-type s3 \
+  --source-path bucket/input.pdf \
+  --output-type s3 \
+  --output-path bucket/thumbnails/out.png
+
+# Submit convert job
+python -m worker.client \
+  --type convert \
+  --source-type file \
+  --source-path /data/doc.docx \
+  --output-type stream \
+  --output-format pdf
+```
+
+### Job Webhook
+
+When a job completes, the worker can send a webhook notification:
+
+```json
+{
+  "success": true,
+  "job_id": "uuid-here",
+  "message": "Thumbnail generated",
+  "output_path": "s3://bucket/thumbnails/out.png",
+  "file_size": 24567
+}
 ```
 
 ---

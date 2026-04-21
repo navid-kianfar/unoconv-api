@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+  unoconv-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: unoconv-api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY:-}
+      - TEMP_DIR=/tmp/thumbnails
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_BUCKET=${S3_BUCKET:-}
+      - FTP_HOST=${FTP_HOST:-}
+      - FTP_PORT=${FTP_PORT:-21}
+      - FTP_USERNAME=${FTP_USERNAME:-}
+      - FTP_PASSWORD=${FTP_PASSWORD:-}
+    depends_on:
+      - rabbitmq
+    volumes:
+      - thumbnail-temp:/tmp/thumbnails
+    restart: unless-stopped
+
+  unoconv-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: unoconv-api:latest
+    environment:
+      - TEMP_DIR=/tmp/thumbnails
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672
+      - QUEUE_NAME=unoconv-jobs
+      - MAX_CONCURRENT=2
+      - JOB_TIMEOUT=300
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_BUCKET=${S3_BUCKET:-}
+      - FTP_HOST=${FTP_HOST:-}
+      - FTP_PORT=${FTP_PORT:-21}
+      - FTP_USERNAME=${FTP_USERNAME:-}
+      - FTP_PASSWORD=${FTP_PASSWORD:-}
+    depends_on:
+      - rabbitmq
+    volumes:
+      - thumbnail-temp:/tmp/thumbnails
+    restart: unless-stopped
+
+volumes:
+  rabbitmq-data:
+  thumbnail-temp:
