@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, Union
 
 import aiofiles
 import aiohttp
@@ -28,7 +28,7 @@ class RemoteStorage:
             return aiohttp.BasicAuth(self.auth_username, self.auth_password)
         return None
 
-    async def download(self, source: url, local_path: str):
+    async def download(self, source: str, local_path: str):
         url = self._parse_url(source)
         auth = self._get_auth(url)
         

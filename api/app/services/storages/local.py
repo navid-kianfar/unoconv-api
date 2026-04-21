@@ -21,7 +21,7 @@ class LocalStorage:
         os.makedirs(os.path.dirname(local_path) or '.', exist_ok=True)
         shutil.copy2(source, local_path)
 
-    async def upload(self, local_path: str, destination: str):
+    async def upload(self, local_path: str, destination: str, content_type: Optional[str] = None):
         destination = self._resolve_path(destination)
         os.makedirs(os.path.dirname(destination) or '.', exist_ok=True)
         shutil.copy2(local_path, destination)

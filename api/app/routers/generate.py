@@ -15,7 +15,7 @@ from app.services.converter_service import ConverterService, ConversionOptions
 API_KEY_HEADER = APIKeyHeader(name="X-API-KEY", auto_error=False)
 
 
-async def require_api_key(api_key: Optional[str] = Header(None)):
+async def require_api_key(api_key: Optional[str] = Header(None, alias="X-API-KEY")):
     expected_key = os.getenv("API_KEY")
     if expected_key and api_key != expected_key:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
