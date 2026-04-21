@@ -1,25 +1,35 @@
 # unoconv-api
 
-A REST API for generating thumbnails and converting files between formats using LibreOffice (unoconv). Supports multiple input/output sources including local files, S3, and FTP storage.
+A REST API for generating thumbnails and converting files between formats using LibreOffice and ImageMagick. Supports multiple storage backends including local files, S3, FTP, SFTP, and remote URLs.
 
 **Features:**
-- Generate thumbnails from images, videos, and documents
-- Convert files between formats (DOCX→PDF, XLSX→PDF, etc.)
-- Input/Output from local files, S3, FTP, or direct upload
+- Generate thumbnails from images, videos, PDFs, and documents
+- Convert files between formats dynamically (LibreOffice + ImageMagick)
+- Multiple storage backends: local, S3, FTP, SFTP, remote URLs
 - Docker multi-arch support (amd64 & arm64)
 - Background worker with RabbitMQ queue support
+- API key authentication
 
 ## Quick Start
 
 ```bash
-# Docker
-cd api && docker-compose up -d
+# Clone and run with Docker
+docker run -d -p 8000:8000 -e API_KEY=your-key -v /data:/data unoconv-api:latest
 
-# Or Python
-cd api && pip install -r requirements.txt && uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Or use Docker Compose
+cd api && cp .env.example .env && docker-compose up -d
 ```
 
-API docs: http://localhost:8000/docs
+API docs: http://localhost:8000/
+
+## API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | API documentation (Swagger UI) |
+| `GET /health` | Health check |
+| `POST /api/v1/thumbnail` | Generate thumbnail |
+| `POST /api/v1/convert` | Convert file |
 
 ---
 
@@ -180,13 +190,16 @@ POST /api/v1/convert
 
 ### Supported Conversions
 
-| From | To |
-|------|-----|
-| DOCX, DOC, DOCM, ODT, RTF, TXT, XML, HTML | PDF |
-| XLSX, XLS, XLSM, ODS | PDF |
-| PPTX, PPT, ODP | PDF |
-| PDF | PNG, JPG |
-| PNG, JPG, GIF, BMP, TIFF, WebP | PNG, JPG, PDF |
+The API automatically detects the input file type and attempts conversion using LibreOffice (for documents) or ImageMagick (for images). The conversion will succeed if LibreOffice or ImageMagick supports the format.
+
+**Common conversions:**
+- Documents (DOCX, DOC, ODT, RTF, TXT, HTML, etc.) → PDF
+- Spreadsheets (XLSX, XLS, ODS, CSV) → PDF
+- Presentations (PPTX, PPT, ODP) → PDF
+- PDF → PNG, JPG
+- Images (PNG, JPG, GIF, BMP, TIFF, WebP) → PNG, JPG, PDF
+
+If a conversion is not supported, the API will return an error with the actual reason.
 
 ### Examples
 
