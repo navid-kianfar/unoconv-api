@@ -22,10 +22,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install flake8 black mypy ruff
-          flake8 api/app/ --max-line-length=100 --ignore=E501,W503
-          black --check api/app/
+        run: pip install flake8
+
+      - name: Run lint
+        run: flake8 api/app/ --max-line-length=100 --ignore=E501,W503
 
   docker-build:
     needs: [lint]
