@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  unoconv-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      platforms:
+        - linux/amd64
+        - linux/arm64
+    image: unoconv-api:latest
+    environment:
+      - TEMP_DIR=/tmp/thumbnails
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_BUCKET=${S3_BUCKET:-}
+    ports:
+      - "8000:8000"
+    volumes:
+      - thumbnail-temp:/tmp/thumbnails
+
+volumes:
+  thumbnail-temp:

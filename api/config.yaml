@@ -1,0 +1,19 @@
+app:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  temp_dir: "/tmp/thumbnails"
+
+s3:
+  endpoint_url: ""
+  access_key: ""
+  secret_key: ""
+  region: "us-east-1"
+  bucket: ""
+
+thumbnail:
+  default_width: 300
+  default_height: 300
+  default_quality: 85
+  default_format: "png"
+  max_file_size: 104857600  # 100MB

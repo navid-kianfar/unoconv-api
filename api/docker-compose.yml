@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  unoconv-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: unoconv-api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - API_KEY=${API_KEY:-}
+      - TEMP_DIR=/tmp/thumbnails
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL:-}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - S3_REGION=${S3_REGION:-us-east-1}
+      - S3_BUCKET=${S3_BUCKET:-}
+      - FTP_HOST=${FTP_HOST:-}
+      - FTP_PORT=${FTP_PORT:-21}
+      - FTP_USERNAME=${FTP_USERNAME:-}
+      - FTP_PASSWORD=${FTP_PASSWORD:-}
+    volumes:
+      - thumbnail-temp:/tmp/thumbnails
+    restart: unless-stopped
+
+volumes:
+  thumbnail-temp:
