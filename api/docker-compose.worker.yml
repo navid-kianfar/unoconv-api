@@ -37,6 +37,8 @@ services:
       - SFTP_USERNAME=${SFTP_USERNAME:-}
       - SFTP_PASSWORD=${SFTP_PASSWORD:-}
       - SFTP_KEY_PATH=${SFTP_KEY_PATH:-}
+      - REMOTE_AUTH_USERNAME=${REMOTE_AUTH_USERNAME:-}
+      - REMOTE_AUTH_PASSWORD=${REMOTE_AUTH_PASSWORD:-}
     depends_on:
       - rabbitmq
     volumes:
@@ -68,6 +70,8 @@ services:
       - SFTP_USERNAME=${SFTP_USERNAME:-}
       - SFTP_PASSWORD=${SFTP_PASSWORD:-}
       - SFTP_KEY_PATH=${SFTP_KEY_PATH:-}
+      - REMOTE_AUTH_USERNAME=${REMOTE_AUTH_USERNAME:-}
+      - REMOTE_AUTH_PASSWORD=${REMOTE_AUTH_PASSWORD:-}
     depends_on:
       - rabbitmq
     volumes:

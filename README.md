@@ -46,11 +46,21 @@ If `API_KEY` is not set, authentication is bypassed (for development).
 
 | Parameter | Description |
 |-----------|-------------|
-| `source_type` | Input source: `upload`, `file`, `local`, `s3`, `ftp`, `sftp` |
-| `source_path` | Path to input file (for file/s3/ftp/sftp) |
-| `output_type` | Output destination: `stream`, `file`, `local`, `s3`, `ftp`, `sftp` |
-| `output_path` | Output path (for file/s3/ftp/sftp) |
+| `source_type` | Input source: `upload`, `file`, `local`, `s3`, `ftp`, `sftp`, `remote` |
+| `source_path` | Path to input file |
+| `output_type` | Output destination: `stream`, `file`, `local`, `s3`, `ftp`, `sftp`, `remote` |
+| `output_path` | Output path |
 | `file` | Multipart file (for upload) |
+
+### Storage Backends
+
+| Backend | Path Format | Description |
+|--------|------------|-------------|
+| `local` | `/path/to/file` | Local filesystem |
+| `s3` | `s3://bucket/key` | AWS S3 or compatible |
+| `ftp` | `ftp://host/path` | FTP server |
+| `sftp` | `sftp://host/path` | SFTP/SSH server |
+| `remote` | `https://url/path` | Remote HTTP/HTTPS URL |
 
 ### Storage Credentials (optional)
 
@@ -69,6 +79,8 @@ If `API_KEY` is not set, authentication is bypassed (for development).
 | `sftp_username` | SFTP username |
 | `sftp_password` | SFTP password |
 | `sftp_key_path` | SFTP private key path |
+| `remote_auth_username` | Remote URL auth username |
+| `remote_auth_password` | Remote URL auth password |
 
 Credentials passed in request override environment variables.
 
@@ -136,6 +148,16 @@ curl -X POST "http://localhost:8000/api/v1/thumbnail" \
   -F "output_type=stream" \
   -F "page=5" \
   -o page5.png
+```
+
+**Remote URL to S3:**
+```bash
+curl -X POST "http://localhost:8000/api/v1/thumbnail" \
+  -H "X-API-KEY: your-key" \
+  -F "source_type=remote" \
+  -F "source_path=https://example.com/document.pdf" \
+  -F "output_type=s3" \
+  -F "output_path=s3://bucket/thumbs/doc.png"
 ```
 
 ---

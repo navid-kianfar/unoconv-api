@@ -67,9 +67,9 @@ def get_converter_service() -> ConverterService:
 
 @router.post("/thumbnail", response_class=StreamingResponse, dependencies=[Depends(require_api_key)])
 async def generate_thumbnail(
-    source_type: str = Form(..., description="upload, file, local, s3, ftp, sftp"),
+    source_type: str = Form(..., description="upload, file, local, s3, ftp, sftp, remote"),
     source_path: Optional[str] = Form(None),
-    output_type: str = Form(..., description="stream, file, local, s3, ftp, sftp"),
+    output_type: str = Form(..., description="stream, file, local, s3, ftp, sftp, remote"),
     output_path: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     width: int = Form(300),
@@ -132,7 +132,7 @@ async def generate_thumbnail(
             if not os.path.exists(source_path):
                 raise HTTPException(status_code=404, detail=f"File not found: {source_path}")
             temp_input = source_path
-        elif source_type in ["s3", "ftp", "sftp"]:
+        elif source_type in ["s3", "ftp", "sftp", "remote"]:
             if not source_path:
                 raise HTTPException(status_code=400, detail="source_path required")
             temp_input = f"/tmp/thumbnails/{uuid.uuid4()}_input"
@@ -166,7 +166,7 @@ async def generate_thumbnail(
                 "output_path": output_path,
                 "file_size": os.path.getsize(output_path)
             }
-        elif output_type in ["s3", "ftp", "sftp"]:
+        elif output_type in ["s3", "ftp", "sftp", "remote"]:
             if not output_path:
                 raise HTTPException(status_code=400, detail="output_path required")
             await storage.upload(output_generated, output_path, f"image/{output_format}")
@@ -255,7 +255,7 @@ async def convert_file(
             if not os.path.exists(source_path):
                 raise HTTPException(status_code=404, detail=f"File not found: {source_path}")
             temp_input = source_path
-        elif source_type in ["s3", "ftp", "sftp"]:
+        elif source_type in ["s3", "ftp", "sftp", "remote"]:
             if not source_path:
                 raise HTTPException(status_code=400, detail="source_path required")
             temp_input = f"/tmp/conversions/{uuid.uuid4()}_input"
@@ -297,7 +297,7 @@ async def convert_file(
                 "output_path": output_path,
                 "file_size": os.path.getsize(output_path)
             }
-        elif output_type in ["s3", "ftp", "sftp"]:
+        elif output_type in ["s3", "ftp", "sftp", "remote"]:
             if not output_path:
                 raise HTTPException(status_code=400, detail="output_path required")
             content_type = mime_map.get(output_format, "application/octet-stream")
