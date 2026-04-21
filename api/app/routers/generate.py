@@ -34,6 +34,11 @@ def get_storage(
     ftp_port: int = 21,
     ftp_username: Optional[str] = None,
     ftp_password: Optional[str] = None,
+    sftp_host: Optional[str] = None,
+    sftp_port: int = 22,
+    sftp_username: Optional[str] = None,
+    sftp_password: Optional[str] = None,
+    sftp_key_path: Optional[str] = None,
 ) -> StorageService:
     return get_storage_service(
         s3_endpoint_url=s3_endpoint_url,
@@ -44,6 +49,11 @@ def get_storage(
         ftp_port=ftp_port,
         ftp_username=ftp_username,
         ftp_password=ftp_password,
+        sftp_host=sftp_host,
+        sftp_port=sftp_port,
+        sftp_username=sftp_username,
+        sftp_password=sftp_password,
+        sftp_key_path=sftp_key_path,
     )
 
 
@@ -57,9 +67,9 @@ def get_converter_service() -> ConverterService:
 
 @router.post("/thumbnail", response_class=StreamingResponse, dependencies=[Depends(require_api_key)])
 async def generate_thumbnail(
-    source_type: str = Form(..., description="upload, file, s3, ftp"),
+    source_type: str = Form(..., description="upload, file, local, s3, ftp, sftp"),
     source_path: Optional[str] = Form(None),
-    output_type: str = Form(..., description="stream, file, s3, ftp"),
+    output_type: str = Form(..., description="stream, file, local, s3, ftp, sftp"),
     output_path: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None),
     width: int = Form(300),
@@ -79,11 +89,17 @@ async def generate_thumbnail(
     ftp_port: int = Form(21),
     ftp_username: Optional[str] = Form(None),
     ftp_password: Optional[str] = Form(None),
+    sftp_host: Optional[str] = Form(None),
+    sftp_port: int = Form(22),
+    sftp_username: Optional[str] = Form(None),
+    sftp_password: Optional[str] = Form(None),
+    sftp_key_path: Optional[str] = Form(None),
 ):
     """Generate thumbnail from images, videos, and documents"""
     storage = get_storage(
         s3_endpoint_url, s3_access_key, s3_secret_key, s3_region,
-        ftp_host, ftp_port, ftp_username, ftp_password
+        ftp_host, ftp_port, ftp_username, ftp_password,
+        sftp_host, sftp_port, sftp_username, sftp_password, sftp_key_path
     )
     thumbnail_service = get_thumbnail_service()
     
@@ -116,7 +132,7 @@ async def generate_thumbnail(
             if not os.path.exists(source_path):
                 raise HTTPException(status_code=404, detail=f"File not found: {source_path}")
             temp_input = source_path
-        elif source_type in ["s3", "ftp"]:
+        elif source_type in ["s3", "ftp", "sftp"]:
             if not source_path:
                 raise HTTPException(status_code=400, detail="source_path required")
             temp_input = f"/tmp/thumbnails/{uuid.uuid4()}_input"
@@ -150,7 +166,7 @@ async def generate_thumbnail(
                 "output_path": output_path,
                 "file_size": os.path.getsize(output_path)
             }
-        elif output_type in ["s3", "ftp"]:
+        elif output_type in ["s3", "ftp", "sftp"]:
             if not output_path:
                 raise HTTPException(status_code=400, detail="output_path required")
             await storage.upload(output_generated, output_path, f"image/{output_format}")
@@ -199,11 +215,17 @@ async def convert_file(
     ftp_port: int = Form(21),
     ftp_username: Optional[str] = Form(None),
     ftp_password: Optional[str] = Form(None),
+    sftp_host: Optional[str] = Form(None),
+    sftp_port: int = Form(22),
+    sftp_username: Optional[str] = Form(None),
+    sftp_password: Optional[str] = Form(None),
+    sftp_key_path: Optional[str] = Form(None),
 ):
     """Convert files between different formats"""
     storage = get_storage(
         s3_endpoint_url, s3_access_key, s3_secret_key, s3_region,
-        ftp_host, ftp_port, ftp_username, ftp_password
+        ftp_host, ftp_port, ftp_username, ftp_password,
+        sftp_host, sftp_port, sftp_username, sftp_password, sftp_key_path
     )
     converter_service = get_converter_service()
     
@@ -233,7 +255,7 @@ async def convert_file(
             if not os.path.exists(source_path):
                 raise HTTPException(status_code=404, detail=f"File not found: {source_path}")
             temp_input = source_path
-        elif source_type in ["s3", "ftp"]:
+        elif source_type in ["s3", "ftp", "sftp"]:
             if not source_path:
                 raise HTTPException(status_code=400, detail="source_path required")
             temp_input = f"/tmp/conversions/{uuid.uuid4()}_input"
@@ -275,7 +297,7 @@ async def convert_file(
                 "output_path": output_path,
                 "file_size": os.path.getsize(output_path)
             }
-        elif output_type in ["s3", "ftp"]:
+        elif output_type in ["s3", "ftp", "sftp"]:
             if not output_path:
                 raise HTTPException(status_code=400, detail="output_path required")
             content_type = mime_map.get(output_format, "application/octet-stream")

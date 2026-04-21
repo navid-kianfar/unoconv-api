@@ -16,3 +16,4 @@ pytest-asyncio==0.23.3
 # Queue/Worker
 bullmq==5.1.0
 aio-pika==9.3.1
+asyncssh==2.14.0

@@ -53,17 +53,43 @@ class JobProcessor:
                 frame=options.get("frame")
             )
             
-            # Download input
+            # Download input - handle missing files
             if source["type"] == "upload":
-                # For worker, upload means base64 encoded data in the payload
                 import base64
                 file_bytes = base64.b64decode(source.get("data", ""))
                 temp_input = f"/tmp/thumbnails/{job_id}_input"
                 async with aiofiles.open(temp_input, 'wb') as f:
                     await f.write(file_bytes)
             else:
-                temp_input = f"/tmp/thumbnails/{job_id}_input"
-                await self.storage.download(source["path"], temp_input)
+                source_path = source.get("path")
+                if not source_path:
+                    return JobResult(
+                        success=False,
+                        job_id=job_id,
+                        message="Source path is required",
+                        error="Missing source path"
+                    )
+                
+                # Check if source exists
+                try:
+                    temp_input = f"/tmp/thumbnails/{job_id}_input"
+                    await self.storage.download(source_path, temp_input)
+                except FileNotFoundError:
+                    return JobResult(
+                        success=False,
+                        job_id=job_id,
+                        message=f"Source file not found: {source_path}",
+                        error="File not found"
+                    )
+                except Exception as e:
+                    if "404" in str(e) or "Not Found" in str(e):
+                        return JobResult(
+                            success=False,
+                            job_id=job_id,
+                            message=f"Source file not found: {source_path}",
+                            error="File not found"
+                        )
+                    raise
             
             # Generate thumbnail
             output_ext = thumbnail_options.output_format.value
@@ -134,7 +160,7 @@ class JobProcessor:
                 page=options.get("page", 1)
             )
             
-            # Download input
+            # Download input - handle missing files
             if source["type"] == "upload":
                 import base64
                 file_bytes = base64.b64decode(source.get("data", ""))
@@ -142,8 +168,34 @@ class JobProcessor:
                 async with aiofiles.open(temp_input, 'wb') as f:
                     await f.write(file_bytes)
             else:
-                temp_input = f"/tmp/conversions/{job_id}_input"
-                await self.storage.download(source["path"], temp_input)
+                source_path = source.get("path")
+                if not source_path:
+                    return JobResult(
+                        success=False,
+                        job_id=job_id,
+                        message="Source path is required",
+                        error="Missing source path"
+                    )
+                
+                try:
+                    temp_input = f"/tmp/conversions/{job_id}_input"
+                    await self.storage.download(source_path, temp_input)
+                except FileNotFoundError:
+                    return JobResult(
+                        success=False,
+                        job_id=job_id,
+                        message=f"Source file not found: {source_path}",
+                        error="File not found"
+                    )
+                except Exception as e:
+                    if "404" in str(e) or "Not Found" in str(e):
+                        return JobResult(
+                            success=False,
+                            job_id=job_id,
+                            message=f"Source file not found: {source_path}",
+                            error="File not found"
+                        )
+                    raise
             
             # Convert
             output_ext = convert_options.output_format

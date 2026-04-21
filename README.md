@@ -46,10 +46,10 @@ If `API_KEY` is not set, authentication is bypassed (for development).
 
 | Parameter | Description |
 |-----------|-------------|
-| `source_type` | Input source: `upload`, `file`, `local`, `s3`, `ftp` |
-| `source_path` | Path to input file (for file/s3/ftp) |
-| `output_type` | Output destination: `stream`, `file`, `local`, `s3`, `ftp` |
-| `output_path` | Output path (for file/s3/ftp) |
+| `source_type` | Input source: `upload`, `file`, `local`, `s3`, `ftp`, `sftp` |
+| `source_path` | Path to input file (for file/s3/ftp/sftp) |
+| `output_type` | Output destination: `stream`, `file`, `local`, `s3`, `ftp`, `sftp` |
+| `output_path` | Output path (for file/s3/ftp/sftp) |
 | `file` | Multipart file (for upload) |
 
 ### Storage Credentials (optional)
@@ -64,6 +64,11 @@ If `API_KEY` is not set, authentication is bypassed (for development).
 | `ftp_port` | FTP port (default: 21) |
 | `ftp_username` | FTP username |
 | `ftp_password` | FTP password |
+| `sftp_host` | SFTP host |
+| `sftp_port` | SFTP port (default: 22) |
+| `sftp_username` | SFTP username |
+| `sftp_password` | SFTP password |
+| `sftp_key_path` | SFTP private key path |
 
 Credentials passed in request override environment variables.
 
@@ -72,7 +77,7 @@ Credentials passed in request override environment variables.
 ## Generate Thumbnail
 
 ```
-POST /api/v1/thumbnail/generate
+POST /api/v1/thumbnail
 ```
 
 ### Thumbnail Parameters

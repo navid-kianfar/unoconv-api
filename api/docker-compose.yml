@@ -20,6 +20,11 @@ services:
       - FTP_PORT=${FTP_PORT:-21}
       - FTP_USERNAME=${FTP_USERNAME:-}
       - FTP_PASSWORD=${FTP_PASSWORD:-}
+      - SFTP_HOST=${SFTP_HOST:-}
+      - SFTP_PORT=${SFTP_PORT:-22}
+      - SFTP_USERNAME=${SFTP_USERNAME:-}
+      - SFTP_PASSWORD=${SFTP_PASSWORD:-}
+      - SFTP_KEY_PATH=${SFTP_KEY_PATH:-}
     volumes:
       - thumbnail-temp:/tmp/thumbnails
     restart: unless-stopped
