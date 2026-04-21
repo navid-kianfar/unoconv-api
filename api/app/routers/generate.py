@@ -22,7 +22,7 @@ async def require_api_key(api_key: Optional[str] = Header(None, alias="X-API-KEY
     return api_key
 
 
-router = APIRouter(prefix="/api/v1", tags=["generate"])
+router = APIRouter(prefix="/api/v1", tags=["generate"], dependencies=[Depends(require_api_key)])
 
 
 def get_storage(
@@ -65,7 +65,7 @@ def get_converter_service() -> ConverterService:
     return ConverterService(temp_dir=os.getenv("TEMP_DIR", "/tmp/conversions"))
 
 
-@router.post("/thumbnail", response_class=StreamingResponse, dependencies=[Depends(require_api_key)])
+@router.post("/thumbnail", response_class=StreamingResponse)
 async def generate_thumbnail(
     source_type: str = Form(..., description="upload, file, local, s3, ftp, sftp, remote"),
     source_path: Optional[str] = Form(None),
@@ -194,7 +194,7 @@ async def generate_thumbnail(
                     pass
 
 
-@router.post("/convert", response_class=StreamingResponse, dependencies=[Depends(require_api_key)])
+@router.post("/convert", response_class=StreamingResponse)
 async def convert_file(
     source_type: str = Form(...),
     source_path: Optional[str] = Form(None),
@@ -322,8 +322,3 @@ async def convert_file(
                     os.remove(path)
                 except Exception:
                     pass
-
-
-@router.get("/health")
-async def health():
-    return {"status": "healthy", "service": "thumbnail-convert-api"}
