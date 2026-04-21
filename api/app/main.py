@@ -38,7 +38,7 @@ app.add_middleware(
 app.include_router(generate.router)
 
 
-@app.get("/", tags=["documentation"])
+@app.get("/", include_in_schema=False)
 async def root():
     return RedirectResponse(url="/docs")
 
