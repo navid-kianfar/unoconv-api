@@ -47,20 +47,19 @@ class JobProcessor:
                 height=options.get("height", 300),
                 quality=options.get("quality", 85),
                 trim=options.get("trim", False),
-                type=options.get("type", "thumbnail"),
                 output_format=options.get("output_format", "png"),
                 page=options.get("page", 1),
                 frame=options.get("frame")
             )
             
             # Download input - handle missing files
-            if source["type"] == "upload":
+            if source["type"] == "stream":
                 import base64
                 file_bytes = base64.b64decode(source.get("data", ""))
                 temp_input = f"/tmp/thumbnails/{job_id}_input"
                 async with aiofiles.open(temp_input, 'wb') as f:
                     await f.write(file_bytes)
-            else:
+            elif source["type"] == "local":
                 source_path = source.get("path")
                 if not source_path:
                     return JobResult(
@@ -113,7 +112,7 @@ class JobProcessor:
                     output_path=encoded,
                     file_size=len(data)
                 )
-            else:
+            elif output["type"] == "local":
                 output_dest = output.get("path", f"thumbnails/{job_id}.{output_ext}")
                 await self.storage.upload(output_path, output_dest, f"image/{output_ext}")
                 return JobResult(
@@ -161,13 +160,13 @@ class JobProcessor:
             )
             
             # Download input - handle missing files
-            if source["type"] == "upload":
+            if source["type"] == "stream":
                 import base64
                 file_bytes = base64.b64decode(source.get("data", ""))
                 temp_input = f"/tmp/conversions/{job_id}_input"
                 async with aiofiles.open(temp_input, 'wb') as f:
                     await f.write(file_bytes)
-            else:
+            elif source["type"] == "local":
                 source_path = source.get("path")
                 if not source_path:
                     return JobResult(
@@ -218,7 +217,7 @@ class JobProcessor:
                     output_path=encoded,
                     file_size=len(data)
                 )
-            else:
+            elif output["type"] == "local":
                 output_dest = output.get("path", f"converted/{job_id}.{output_ext}")
                 content_type = "application/pdf" if output_ext == "pdf" else f"image/{output_ext}"
                 await self.storage.upload(output_path, output_dest, content_type)

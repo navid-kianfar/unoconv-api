@@ -21,7 +21,7 @@ class LocalStorage:
         os.makedirs(os.path.dirname(local_path) or '.', exist_ok=True)
         shutil.copy2(source, local_path)
 
-    async def upload(self, local_path: str, destination: str, content_type: Optional[str] = None):
+    async def upload(self, local_path: str, destination: str, content_type: str = "application/octet-stream"):
         destination = self._resolve_path(destination)
         os.makedirs(os.path.dirname(destination) or '.', exist_ok=True)
         shutil.copy2(local_path, destination)
@@ -31,7 +31,7 @@ class LocalStorage:
         async with aiofiles.open(path, 'rb') as f:
             return await f.read()
 
-    async def put(self, data: bytes, destination: str):
+    async def put(self, data: bytes, destination: str, content_type: str = "application/octet-stream"):
         destination = self._resolve_path(destination)
         os.makedirs(os.path.dirname(destination) or '.', exist_ok=True)
         async with aiofiles.open(destination, 'wb') as f:

@@ -1,5 +1,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *$py.class
 
@@ -46,7 +47,16 @@ coverage.xml
 venv/
 ENV/
 env/
-.venv
+.venv/
+.env/
+bin/
+include/
+pylatexenc/
+lib/
+lib64/
+share/
+pyvenv.cfg
+pip-selfcheck.json
 
 # IDEs
 .vscode/
@@ -58,6 +68,8 @@ env/
 # Environment
 .env
 .env.local
+.env.*
+!.env.example
 
 # OS
 .DS_Store

@@ -29,7 +29,7 @@ class FTPStorage:
         async with aioftp.Client(host, self.port, self.username, self.password) as client:
             await client.download(remote_path, local_path)
 
-    async def upload(self, local_path: str, destination: str):
+    async def upload(self, local_path: str, destination: str, content_type: str = "application/octet-stream"):
         host, remote_path = self._parse_path(destination)
         async with aioftp.Client(host, self.port, self.username, self.password) as client:
             await client.upload(local_path, remote_path)
@@ -40,7 +40,7 @@ class FTPStorage:
             async with client.download_stream(remote_path) as stream:
                 return await stream.read()
 
-    async def put(self, data: bytes, destination: str):
+    async def put(self, data: bytes, destination: str, content_type: str = "application/octet-stream"):
         host, remote_path = self._parse_path(destination)
         async with aioftp.Client(host, self.port, self.username, self.password) as client:
             async with client.upload_stream(remote_path) as stream:

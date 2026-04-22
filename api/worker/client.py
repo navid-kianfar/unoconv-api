@@ -84,9 +84,9 @@ async def main():
     
     parser = argparse.ArgumentParser(description="Submit jobs to unoconv-api worker")
     parser.add_argument("--type", choices=["thumbnail", "convert"], required=True)
-    parser.add_argument("--source-type", default="file")
+    parser.add_argument("--source-type", choices=["stream", "local", "s3", "ftp", "sftp", "remote"], default="local")
     parser.add_argument("--source-path", required=True)
-    parser.add_argument("--output-type", default="file")
+    parser.add_argument("--output-type", choices=["stream", "local", "s3", "ftp", "sftp", "remote"], default="local")
     parser.add_argument("--output-path", required=True)
     parser.add_argument("--output-format", default="pdf")
     parser.add_argument("--webhook", help="URL to notify on completion")
@@ -97,11 +97,11 @@ async def main():
     client = QueueClient(rabbitmq_url=args.rabbitmq)
     
     source = {"type": args.source_type}
-    if args.source_type != "upload":
+    if args.source_type != "stream":
         source["path"] = args.source_path
     
     output = {"type": args.output_type}
-    if args.output_type not in ["stream"]:
+    if args.output_type != "stream":
         output["path"] = args.output_path
     
     options = {"output_format": args.output_format}

@@ -1,28 +1,21 @@
 import os
 import uuid
-from typing import Optional
+from typing import Optional, Annotated
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Header, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Header, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from fastapi.security import APIKeyHeader
 import aiofiles
 
+
 from app.services.storage_service import StorageService, get_storage_service
 from app.services.thumbnail_service import ThumbnailService, ThumbnailOptions
 from app.services.converter_service import ConverterService, ConversionOptions
+from app.models.enums import SourceType, OutputType, ThumbnailFormat, ConversionFormat
+from app.core.security import validate_api_key
 
 
-API_KEY_HEADER = APIKeyHeader(name="X-API-KEY", auto_error=False)
-
-
-async def require_api_key(api_key: Optional[str] = Header(None, alias="X-API-KEY")):
-    expected_key = os.getenv("API_KEY")
-    if expected_key and api_key != expected_key:
-        raise HTTPException(status_code=401, detail="Invalid or missing API key")
-    return api_key
-
-
-router = APIRouter(prefix="/api/v1", tags=["generate"], dependencies=[Depends(require_api_key)])
+router = APIRouter(prefix="/api/v1", tags=["generate"], dependencies=[Depends(validate_api_key)])
 
 
 def get_storage(
@@ -65,21 +58,31 @@ def get_converter_service() -> ConverterService:
     return ConverterService(temp_dir=os.getenv("TEMP_DIR", "/tmp/conversions"))
 
 
+def cleanup_temp_files(paths: list[str]):
+    """Cleanup temporary files after response is sent"""
+    for path in paths:
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+
+
 @router.post("/thumbnail", response_class=StreamingResponse)
 async def generate_thumbnail(
-    source_type: str = Form(..., description="upload, file, local, s3, ftp, sftp, remote"),
-    source_path: Optional[str] = Form(None),
-    output_type: str = Form(..., description="stream, file, local, s3, ftp, sftp, remote"),
-    output_path: Optional[str] = Form(None),
-    file: Optional[UploadFile] = File(None),
-    width: int = Form(300),
-    height: int = Form(300),
-    quality: int = Form(85),
-    trim: bool = Form(False),
-    type: str = Form("thumbnail"),
-    output_format: str = Form("png"),
-    page: int = Form(1, ge=1, description="Page number for documents (default: 1)"),
-    frame: Optional[int] = Form(None, description="Frame number for videos (default: middle)"),
+    source_type: Annotated[SourceType, Form(description="Source storage type")],
+    output_type: Annotated[OutputType, Form(description="Output storage type")],
+    background_tasks: BackgroundTasks,
+    source_path: Annotated[Optional[str], Form()] = None,
+    output_path: Annotated[Optional[str], Form()] = None,
+    file: UploadFile = File(None, description="File to upload"),
+    width: Annotated[int, Form()] = 300,
+    height: Annotated[int, Form()] = 300,
+    quality: Annotated[int, Form()] = 85,
+    trim: Annotated[bool, Form()] = False,
+    output_format: Annotated[ThumbnailFormat, Form()] = ThumbnailFormat.PNG,
+    page: Annotated[int, Form(ge=1, description="Page number for documents (default: 1)")] = 1,
+    frame: Annotated[Optional[int], Form(description="Frame number for videos (default: middle)")] = None,
     # Storage credentials
     s3_endpoint_url: Optional[str] = Form(None),
     s3_access_key: Optional[str] = Form(None),
@@ -108,7 +111,6 @@ async def generate_thumbnail(
         height=height,
         quality=quality,
         trim=trim,
-        type=type,
         output_format=output_format,
         page=page,
         frame=frame
@@ -119,20 +121,20 @@ async def generate_thumbnail(
     
     try:
         # Handle input
-        if source_type == "upload":
+        if source_type == SourceType.STREAM:
             if not file:
-                raise HTTPException(status_code=400, detail="File required for upload")
+                raise HTTPException(status_code=400, detail="File required for stream upload")
             file_bytes = await file.read()
             source_ext = file.filename.split('.')[-1] if file.filename else 'tmp'
             temp_input = f"/tmp/thumbnails/{uuid.uuid4()}.{source_ext}"
             await storage.put(file_bytes, temp_input)
-        elif source_type in ["file", "local"]:
+        elif source_type == SourceType.LOCAL:
             if not source_path:
-                raise HTTPException(status_code=400, detail="source_path required")
+                raise HTTPException(status_code=400, detail="source_path required for local input")
             if not os.path.exists(source_path):
-                raise HTTPException(status_code=404, detail=f"File not found: {source_path}")
+                raise HTTPException(status_code=404, detail=f"Local file not found: {source_path}")
             temp_input = source_path
-        elif source_type in ["s3", "ftp", "sftp", "remote"]:
+        elif source_type in [SourceType.S3, SourceType.FTP, SourceType.SFTP, SourceType.REMOTE]:
             if not source_path:
                 raise HTTPException(status_code=400, detail="source_path required")
             temp_input = f"/tmp/thumbnails/{uuid.uuid4()}_input"
@@ -141,35 +143,47 @@ async def generate_thumbnail(
             raise HTTPException(status_code=400, detail=f"Invalid source_type: {source_type}")
         
         # Generate thumbnail
-        temp_output = f"/tmp/thumbnails/thumbnail_{uuid.uuid4()}.{output_format}"
+        temp_output = f"/tmp/thumbnails/thumbnail_{uuid.uuid4()}.{output_format.value}"
         output_generated = await thumbnail_service.generate(temp_input, temp_output, options)
         
         # Handle output
-        if output_type == "stream":
+        if output_type == OutputType.STREAM:
             async def iter_file():
                 async with aiofiles.open(output_generated, 'rb') as f:
                     while chunk := await f.read(8192):
                         yield chunk
             
+            # Cleanup in background
+            files_to_cleanup = []
+            if temp_input and temp_input != source_path:
+                files_to_cleanup.append(temp_input)
+            files_to_cleanup.append(output_generated)
+            background_tasks.add_task(cleanup_temp_files, files_to_cleanup)
+            
             return StreamingResponse(
                 iter_file(),
-                media_type=f"image/{output_format}",
-                headers={"Content-Disposition": f"attachment; filename=thumbnail.{output_format}"}
+                media_type=f"image/{output_format.value}",
+                headers={"Content-Disposition": f"attachment; filename=thumbnail.{output_format.value}"}
             )
-        elif output_type in ["file", "local"]:
+        elif output_type == OutputType.LOCAL:
             if not output_path:
-                raise HTTPException(status_code=400, detail="output_path required for file output")
+                raise HTTPException(status_code=400, detail="output_path required for local output")
+            # For local output, we just move/copy the file or use storage.upload
             await storage.upload(output_generated, output_path)
             return {
                 "success": True,
-                "message": "Thumbnail generated",
+                "message": "Thumbnail generated locally",
                 "output_path": output_path,
                 "file_size": os.path.getsize(output_path)
             }
-        elif output_type in ["s3", "ftp", "sftp", "remote"]:
-            if not output_path:
-                raise HTTPException(status_code=400, detail="output_path required")
-            await storage.upload(output_generated, output_path, f"image/{output_format}")
+            # Cleanup non-stream outputs
+            files_to_cleanup = []
+            if temp_input and temp_input != source_path:
+                files_to_cleanup.append(temp_input)
+            if output_generated:
+                files_to_cleanup.append(output_generated)
+            background_tasks.add_task(cleanup_temp_files, files_to_cleanup)
+            
             return {
                 "success": True,
                 "message": f"Thumbnail uploaded to {output_type}: {output_path}",
@@ -183,29 +197,22 @@ async def generate_thumbnail(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        for path in [temp_input, temp_output]:
-            if path and os.path.exists(path) and not path.startswith('/tmp/thumbnails/'):
-                pass
-            elif path and os.path.exists(path):
-                try:
-                    os.remove(path)
-                except Exception:
-                    pass
+# Removed immediate finally block to prevent race conditions with StreamingResponse
 
 
 @router.post("/convert", response_class=StreamingResponse)
 async def convert_file(
-    source_type: str = Form(...),
-    source_path: Optional[str] = Form(None),
-    output_type: str = Form(...),
-    output_path: Optional[str] = Form(None),
-    file: Optional[UploadFile] = File(None),
-    output_format: str = Form(..., description="Target format: pdf, png, jpg, docx, xlsx, etc."),
-    page: int = Form(1, ge=1, description="Page number for multi-page inputs"),
-    quality: int = Form(85),
-    width: Optional[int] = Form(None),
-    height: Optional[int] = Form(None),
+    source_type: Annotated[SourceType, Form()],
+    output_type: Annotated[OutputType, Form()],
+    background_tasks: BackgroundTasks,
+    output_format: Annotated[ConversionFormat, Form(description="Target format")],
+    source_path: Annotated[Optional[str], Form()] = None,
+    output_path: Annotated[Optional[str], Form()] = None,
+    file: UploadFile = File(None, description="File to upload"),
+    page: Annotated[int, Form(ge=1, description="Page number for multi-page inputs")] = 1,
+    quality: Annotated[int, Form()] = 85,
+    width: Annotated[Optional[int], Form()] = None,
+    height: Annotated[Optional[int], Form()] = None,
     # Storage credentials
     s3_endpoint_url: Optional[str] = Form(None),
     s3_access_key: Optional[str] = Form(None),
@@ -242,20 +249,20 @@ async def convert_file(
     
     try:
         # Handle input
-        if source_type == "upload":
+        if source_type == SourceType.STREAM:
             if not file:
-                raise HTTPException(status_code=400, detail="File required for upload")
+                raise HTTPException(status_code=400, detail="File required for stream upload")
             file_bytes = await file.read()
             source_ext = file.filename.split('.')[-1] if file.filename else 'tmp'
             temp_input = f"/tmp/conversions/{uuid.uuid4()}.{source_ext}"
             await storage.put(file_bytes, temp_input)
-        elif source_type in ["file", "local"]:
+        elif source_type == SourceType.LOCAL:
             if not source_path:
-                raise HTTPException(status_code=400, detail="source_path required")
+                raise HTTPException(status_code=400, detail="source_path required for local input")
             if not os.path.exists(source_path):
-                raise HTTPException(status_code=404, detail=f"File not found: {source_path}")
+                raise HTTPException(status_code=404, detail=f"Local file not found: {source_path}")
             temp_input = source_path
-        elif source_type in ["s3", "ftp", "sftp", "remote"]:
+        elif source_type in [SourceType.S3, SourceType.FTP, SourceType.SFTP, SourceType.REMOTE]:
             if not source_path:
                 raise HTTPException(status_code=400, detail="source_path required")
             temp_input = f"/tmp/conversions/{uuid.uuid4()}_input"
@@ -264,7 +271,7 @@ async def convert_file(
             raise HTTPException(status_code=400, detail=f"Invalid source_type: {source_type}")
         
         # Convert
-        temp_output = f"/tmp/conversions/converted_{uuid.uuid4()}.{output_format}"
+        temp_output = f"/tmp/conversions/converted_{uuid.uuid4()}.{output_format.value}"
         output_generated = await converter_service.convert(temp_input, temp_output, options)
         
         # Handle output
@@ -276,32 +283,42 @@ async def convert_file(
             "gif": "image/gif",
         }
         
-        if output_type == "stream":
+        if output_type == OutputType.STREAM:
             async def iter_file():
                 async with aiofiles.open(output_generated, 'rb') as f:
                     while chunk := await f.read(8192):
                         yield chunk
             
+            # Cleanup in background
+            files_to_cleanup = []
+            if temp_input and temp_input != source_path:
+                files_to_cleanup.append(temp_input)
+            files_to_cleanup.append(output_generated)
+            background_tasks.add_task(cleanup_temp_files, files_to_cleanup)
+            
             return StreamingResponse(
                 iter_file(),
-                media_type=mime_map.get(output_format, "application/octet-stream"),
-                headers={"Content-Disposition": f"attachment; filename=converted.{output_format}"}
+                media_type=mime_map.get(output_format.value, "application/octet-stream"),
+                headers={"Content-Disposition": f"attachment; filename=converted.{output_format.value}"}
             )
-        elif output_type in ["file", "local"]:
+        elif output_type == OutputType.LOCAL:
             if not output_path:
-                raise HTTPException(status_code=400, detail="output_path required")
+                raise HTTPException(status_code=400, detail="output_path required for local output")
             await storage.upload(output_generated, output_path)
             return {
                 "success": True,
-                "message": f"Converted to {output_format}",
+                "message": f"Converted locally to {output_format.value}",
                 "output_path": output_path,
                 "file_size": os.path.getsize(output_path)
             }
-        elif output_type in ["s3", "ftp", "sftp", "remote"]:
-            if not output_path:
-                raise HTTPException(status_code=400, detail="output_path required")
-            content_type = mime_map.get(output_format, "application/octet-stream")
-            await storage.upload(output_generated, output_path, content_type)
+            # Cleanup non-stream outputs
+            files_to_cleanup = []
+            if temp_input and temp_input != source_path:
+                files_to_cleanup.append(temp_input)
+            if output_generated:
+                files_to_cleanup.append(output_generated)
+            background_tasks.add_task(cleanup_temp_files, files_to_cleanup)
+            
             return {
                 "success": True,
                 "message": f"Converted and uploaded to {output_type}: {output_path}",
@@ -315,10 +332,4 @@ async def convert_file(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        for path in [temp_input, temp_output]:
-            if path and os.path.exists(path):
-                try:
-                    os.remove(path)
-                except Exception:
-                    pass
+# Removed immediate finally block to prevent race conditions with StreamingResponse

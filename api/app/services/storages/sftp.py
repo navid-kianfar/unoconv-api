@@ -46,7 +46,7 @@ class SFTPStorage:
         async with asyncssh.connect(**connect_kwargs) as conn:
             await conn.get(remote_path, local_path)
 
-    async def upload(self, local_path: str, destination: str):
+    async def upload(self, local_path: str, destination: str, content_type: str = "application/octet-stream"):
         host, remote_path = self._parse_path(destination)
         
         connect_kwargs = self._get_connect_kwargs()
@@ -65,7 +65,7 @@ class SFTPStorage:
             async with conn.open(remote_path) as f:
                 return await f.read()
 
-    async def put(self, data: bytes, destination: str):
+    async def put(self, data: bytes, destination: str, content_type: str = "application/octet-stream"):
         host, remote_path = self._parse_path(destination)
         
         connect_kwargs = self._get_connect_kwargs()

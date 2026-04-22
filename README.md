@@ -8,7 +8,7 @@ A REST API for generating thumbnails and converting files between formats using 
 - Multiple storage backends: local, S3, FTP, SFTP, remote URLs
 - Docker multi-arch support (amd64 & arm64)
 - Background worker with RabbitMQ queue support
-- API key authentication
+- API key authentication (Global Swagger Authorization)
 
 ## Quick Start
 
@@ -22,20 +22,11 @@ cd api && cp .env.example .env && docker-compose up -d
 
 API docs: http://localhost:8000/
 
-## API Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /` | API documentation (Swagger UI) |
-| `GET /health` | Health check |
-| `POST /api/v1/thumbnail` | Generate thumbnail |
-| `POST /api/v1/convert` | Convert file |
-
 ---
 
 ## Authentication
 
-All endpoints require `X-API-KEY` header:
+All endpoints require `X-API-KEY` header. In Swagger UI, use the **"Authorize"** button at the top to set your key once for all requests.
 
 ```bash
 curl -X POST "http://localhost:8000/api/v1/thumbnail" \
@@ -56,43 +47,27 @@ If `API_KEY` is not set, authentication is bypassed (for development).
 
 | Parameter | Description |
 |-----------|-------------|
-| `source_type` | Input source: `upload`, `file`, `local`, `s3`, `ftp`, `sftp`, `remote` |
-| `source_path` | Path to input file |
-| `output_type` | Output destination: `stream`, `file`, `local`, `s3`, `ftp`, `sftp`, `remote` |
-| `output_path` | Output path |
-| `file` | Multipart file (for upload) |
+| `source_type` | Input source: `stream`, `local`, `s3`, `ftp`, `sftp`, `remote` |
+| `source_path` | Path to input file (required for all except `stream`) |
+| `output_type` | Output destination: `stream`, `local`, `s3`, `ftp`, `sftp`, `remote` |
+| `output_path` | Output path (required for all except `stream`) |
+| `file` | Multipart file upload (required when `source_type` is `stream`) |
 
 ### Storage Backends
 
 | Backend | Path Format | Description |
 |--------|------------|-------------|
-| `local` | `/path/to/file` | Local filesystem |
+| `stream` | (Multipart File) | Direct upload/download in the request/response |
+| `local` | `/path/to/file` | Local filesystem on the server machine |
 | `s3` | `s3://bucket/key` | AWS S3 or compatible |
 | `ftp` | `ftp://host/path` | FTP server |
 | `sftp` | `sftp://host/path` | SFTP/SSH server |
-| `remote` | `https://url/path` | Remote HTTP/HTTPS URL |
+| `remote` | `https://url/path` | Remote HTTP/HTTPS URL (source only) |
 
 ### Storage Credentials (optional)
 
-| Parameter | Description |
-|-----------|-------------|
-| `s3_endpoint_url` | S3 endpoint URL |
-| `s3_access_key` | S3 access key |
-| `s3_secret_key` | S3 secret key |
-| `s3_region` | S3 region |
-| `ftp_host` | FTP host |
-| `ftp_port` | FTP port (default: 21) |
-| `ftp_username` | FTP username |
-| `ftp_password` | FTP password |
-| `sftp_host` | SFTP host |
-| `sftp_port` | SFTP port (default: 22) |
-| `sftp_username` | SFTP username |
-| `sftp_password` | SFTP password |
-| `sftp_key_path` | SFTP private key path |
-| `remote_auth_username` | Remote URL auth username |
-| `remote_auth_password` | Remote URL auth password |
-
-Credentials passed in request override environment variables.
+Credentials can be passed in the request body to override environment variables:
+`s3_endpoint_url`, `s3_access_key`, `s3_secret_key`, `s3_region`, `ftp_host`, `ftp_port`, `ftp_username`, `ftp_password`, `sftp_host`, `sftp_port`, `sftp_username`, `sftp_password`, `sftp_key_path`.
 
 ---
 
@@ -106,12 +81,11 @@ POST /api/v1/thumbnail
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `output_format` | `png` | Output format: `png`, `jpg`, `gif` |
+| `output_format` | `png` | Dropdown: `png`, `jpg`, `gif` |
 | `width` | 300 | Output width in pixels |
 | `height` | 300 | Output height in pixels |
 | `quality` | 85 | JPEG quality (1-100) |
 | `trim` | false | Trim whitespace |
-| `type` | thumbnail | `thumbnail` or `firstpage` |
 | `page` | 1 | Page number for documents |
 | `frame` | auto | Frame number for videos (default: middle) |
 
@@ -124,50 +98,17 @@ curl -X POST "http://localhost:8000/api/v1/thumbnail" \
   -F "source_type=s3" \
   -F "source_path=bucket/docs/report.pdf" \
   -F "output_type=s3" \
-  -F "output_path=bucket/thumbs/report.png" \
-  -F "width=300" -F "height=300"
+  -F "output_path=bucket/thumbs/report.png"
 ```
 
 **Upload → Stream download:**
 ```bash
 curl -X POST "http://localhost:8000/api/v1/thumbnail" \
   -H "X-API-KEY: your-key" \
-  -F "source_type=upload" \
+  -F "source_type=stream" \
   -F "file=@document.pdf" \
   -F "output_type=stream" \
   -o thumbnail.png
-```
-
-**Video with specific frame:**
-```bash
-curl -X POST "http://localhost:8000/api/v1/thumbnail" \
-  -H "X-API-KEY: your-key" \
-  -F "source_type=s3" \
-  -F "source_path=bucket/videos/movie.mp4" \
-  -F "output_type=stream" \
-  -F "frame=100" \
-  -o thumbnail.png
-```
-
-**Document specific page:**
-```bash
-curl -X POST "http://localhost:8000/api/v1/thumbnail" \
-  -H "X-API-KEY: your-key" \
-  -F "source_type=file" \
-  -F "source_path=/data/doc.pdf" \
-  -F "output_type=stream" \
-  -F "page=5" \
-  -o page5.png
-```
-
-**Remote URL to S3:**
-```bash
-curl -X POST "http://localhost:8000/api/v1/thumbnail" \
-  -H "X-API-KEY: your-key" \
-  -F "source_type=remote" \
-  -F "source_path=https://example.com/document.pdf" \
-  -F "output_type=s3" \
-  -F "output_path=s3://bucket/thumbs/doc.png"
 ```
 
 ---
@@ -183,159 +124,8 @@ POST /api/v1/convert
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `output_format` | (required) | Target format: `pdf`, `png`, `jpg`, `docx`, `xlsx`, etc. |
-| `page` | 1 | Page number for multi-page inputs |
-| `quality` | 85 | Output quality (1-100) |
-| `width` | - | Resize width (optional) |
-| `height` | - | Resize height (optional) |
-
-### Supported Conversions
-
-The API automatically detects the input file type and attempts conversion using LibreOffice (for documents) or ImageMagick (for images). The conversion will succeed if LibreOffice or ImageMagick supports the format.
-
-**Common conversions:**
-- Documents (DOCX, DOC, ODT, RTF, TXT, HTML, etc.) → PDF
-- Spreadsheets (XLSX, XLS, ODS, CSV) → PDF
-- Presentations (PPTX, PPT, ODP) → PDF
-- PDF → PNG, JPG
-- Images (PNG, JPG, GIF, BMP, TIFF, WebP) → PNG, JPG, PDF
-
-If a conversion is not supported, the API will return an error with the actual reason.
-
-### Examples
-
-**DOCX → PDF (S3 to S3):**
-```bash
-curl -X POST "http://localhost:8000/api/v1/convert" \
-  -H "X-API-KEY: your-key" \
-  -F "source_type=s3" \
-  -F "source_path=bucket/docs/report.docx" \
-  -F "output_type=s3" \
-  -F "output_path=bucket/converted/report.pdf" \
-  -F "output_format=pdf"
-```
-
-**Upload → S3:**
-```bash
-curl -X POST "http://localhost:8000/api/v1/convert" \
-  -H "X-API-KEY: your-key" \
-  -F "source_type=upload" \
-  -F "file=@spreadsheet.xlsx" \
-  -F "output_type=s3" \
-  -F "output_path=bucket/output/spreadsheet.pdf" \
-  -F "output_format=pdf"
-```
-
-**FTP to Stream:**
-```bash
-curl -X POST "http://localhost:8000/api/v1/convert" \
-  -H "X-API-KEY: your-key" \
-  -F "source_type=ftp" \
-  -F "source_path=ftp.example.com/docs/file.docx" \
-  -F "output_type=stream" \
-  -F "output_format=pdf" \
-  -o file.pdf
-```
-
----
-
-## Input/Output Matrix
-
-| source_type | output_type | Use Case |
-|-------------|-------------|----------|
-| upload | stream | Browser upload → download |
-| upload | file | Upload → save locally |
-| upload | s3 | Upload → save to S3 |
-| upload | ftp | Upload → save to FTP |
-| file | stream | Local file → download |
-| file | file | Local file → local output |
-| file | s3 | Local file → S3 |
-| file | ftp | Local file → FTP |
-| s3 | stream | S3 → download |
-| s3 | file | S3 → local |
-| s3 | s3 | S3 → S3 |
-| s3 | ftp | S3 → FTP |
-| ftp | stream | FTP → download |
-| ftp | file | FTP → local |
-| ftp | s3 | FTP → S3 |
-| ftp | ftp | FTP → FTP |
-
----
-
-## Python Examples
-
-### Thumbnail
-```python
-import requests
-
-headers = {"X-API-KEY": "your-key"}
-
-# S3 → S3 with credentials
-resp = requests.post("http://localhost:8000/api/v1/thumbnail", 
-    headers=headers,
-    data={
-        "source_type": "s3",
-        "source_path": "bucket/input.pdf",
-        "output_type": "s3",
-        "output_path": "bucket/output/thumb.png",
-        "width": 300,
-        "height": 300,
-    })
-```
-
-### Convert
-```python
-import requests
-
-headers = {"X-API-KEY": "your-key"}
-
-# Convert DOCX to PDF
-resp = requests.post("http://localhost:8000/api/v1/convert",
-    headers=headers,
-    data={
-        "source_type": "file",
-        "source_path": "/data/doc.docx",
-        "output_type": "stream",
-        "output_format": "pdf"
-    })
-
-with open("output.pdf", "wb") as f:
-    f.write(resp.content)
-```
-
----
-
-## Environment Variables
-
-```bash
-# Authentication
-API_KEY=your-secure-api-key
-
-# Temp directories
-TEMP_DIR=/tmp/thumbnails
-
-# S3 (optional)
-S3_ENDPOINT_URL=https://s3.amazonaws.com
-S3_ACCESS_KEY=your-key
-S3_SECRET_KEY=your-secret
-S3_REGION=us-east-1
-S3_BUCKET=default-bucket
-
-# FTP (optional)
-FTP_HOST=ftp.example.com
-FTP_PORT=21
-FTP_USERNAME=user
-FTP_PASSWORD=pass
-```
-
----
-
-## Docker Multi-Arch Build
-
-```bash
-docker buildx create --name mybuilder --use
-docker buildx build --platform linux/amd64,linux/arm64 \
-  -t thumbnail-api:latest --push .
-```
+| `source_type` | `stream` | `stream`, `local`, `s3`, etc. |
+| `output_type` | `stream` | `stream`, `local`, `s3`, etc. |
 
 ---
 
@@ -371,7 +161,7 @@ docker-compose -f docker-compose.worker.yml up -d unoconv-worker
 | `MAX_CONCURRENT` | 2 | Max parallel jobs |
 | `JOB_TIMEOUT` | 300 | Job timeout (seconds) |
 
-### Submit Jobs via Client
+### Submit Jobs via Python
 
 ```python
 from worker import QueueClient
@@ -382,17 +172,10 @@ async def submit():
     
     # Submit thumbnail job
     await client.submit_thumbnail(
-        source={"type": "s3", "path": "bucket/docs/file.pdf"},
-        output={"type": "s3", "path": "bucket/thumbs/out.png"},
+        source={"type": "local", "path": "/data/input.pdf"},
+        output={"type": "local", "path": "/data/thumbnails/out.png"},
         options={"width": 300, "height": 300},
-        webhook_url="https://myapp.com/webhook"  # optional
-    )
-    
-    # Submit conversion job
-    await client.submit_convert(
-        source={"type": "file", "path": "/data/doc.docx"},
-        output={"type": "stream"},
-        options={"output_format": "pdf"}
+        webhook_url="https://myapp.com/webhook"
     )
     
     await client.disconnect()
@@ -403,36 +186,50 @@ asyncio.run(submit())
 ### CLI Client
 
 ```bash
-# Submit thumbnail job
+# Submit thumbnail job (local to local)
 python -m worker.client \
   --type thumbnail \
-  --source-type s3 \
-  --source-path bucket/input.pdf \
-  --output-type s3 \
-  --output-path bucket/thumbnails/out.png
+  --source-type local \
+  --source-path /data/input.pdf \
+  --output-type local \
+  --output-path /data/thumbnails/out.png
 
-# Submit convert job
+# Submit convert job (S3 to S3)
 python -m worker.client \
   --type convert \
-  --source-type file \
-  --source-path /data/doc.docx \
-  --output-type stream \
+  --source-type s3 \
+  --source-path bucket/doc.docx \
+  --output-type s3 \
+  --output-path bucket/pdf/doc.pdf \
   --output-format pdf
 ```
 
 ### Job Webhook
 
-When a job completes, the worker can send a webhook notification:
+When a job completes, the worker can send a JSON payload to the `webhook_url`:
 
 ```json
 {
   "success": true,
   "job_id": "uuid-here",
   "message": "Thumbnail generated",
-  "output_path": "s3://bucket/thumbnails/out.png",
+  "output_path": "local:/data/thumbnails/out.png",
   "file_size": 24567
 }
 ```
+
+---
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `API_KEY` | Your secure API key |
+| `TEMP_DIR` | Directory for temporary files |
+| `S3_ENDPOINT_URL` | S3 endpoint URL (optional) |
+| `S3_ACCESS_KEY` | S3 access key (optional) |
+| `S3_SECRET_KEY` | S3 secret key (optional) |
+| `S3_REGION` | S3 region (optional) |
 
 ---
 

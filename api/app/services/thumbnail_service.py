@@ -7,11 +7,6 @@ from enum import Enum
 import aiofiles
 
 
-class ThumbnailType(str, Enum):
-    THUMBNAIL = "thumbnail"
-    FIRSTPAGE = "firstpage"
-
-
 class OutputFormat(str, Enum):
     PNG = "png"
     JPG = "jpg"
@@ -25,7 +20,6 @@ class ThumbnailOptions:
         height: int = 300,
         quality: int = 85,
         trim: bool = False,
-        type: ThumbnailType = ThumbnailType.THUMBNAIL,
         output_format: OutputFormat = OutputFormat.PNG,
         page: int = 1,
         frame: Optional[int] = None,
@@ -34,7 +28,6 @@ class ThumbnailOptions:
         self.height = height
         self.quality = quality
         self.trim = trim
-        self.type = type
         self.output_format = output_format
         self.page = page
         self.frame = frame
@@ -70,11 +63,7 @@ class ThumbnailService:
 
     def _build_image_command(self, input_path: str, output_path: str, options: ThumbnailOptions) -> str:
         trim_flag = '-trim' if options.trim else ''
-        
-        if options.type == ThumbnailType.THUMBNAIL:
-            geometry = f'-geometry {options.height} -extent {options.width}x{options.height}'
-        else:
-            geometry = ''
+        geometry = f'-geometry {options.height} -extent {options.width}x{options.height}'
         
         cmd = f'convert {trim_flag} -quality {options.quality} {geometry} -colorspace RGB "{input_path}" "{output_path}"'
         return cmd
@@ -100,10 +89,7 @@ class ThumbnailService:
             cmd = f'{unoconv_cmd} && convert -density 150 -quality {options.quality} -geometry {options.height} -extent {options.width}x{options.height} {pdf_input}[0] "{output_path}" && rm -f "{tmp_pdf}"'
             return cmd
         
-        if options.type == ThumbnailType.THUMBNAIL:
-            return f'convert -density 150 -quality {options.quality} -geometry {options.height} -extent {options.width}x{options.height} {pdf_input}[{options.page - 1}] "{output_path}"'
-        else:
-            return f'convert -quality {options.quality} {pdf_input}[{options.page - 1}] "{output_path}"'
+        return f'convert -density 150 -quality {options.quality} -geometry {options.height} -extent {options.width}x{options.height} {pdf_input}[{options.page - 1}] "{output_path}"'
 
     async def generate(
         self,

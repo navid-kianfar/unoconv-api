@@ -1,12 +1,12 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 from app.routers import generate
-
+from app.core.security import validate_api_key
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

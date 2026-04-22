@@ -42,7 +42,7 @@ class RemoteStorage:
                     async for chunk in response.content.iter_chunked(8192):
                         await f.write(chunk)
 
-    async def upload(self, local_path: str, destination: str):
+    async def upload(self, local_path: str, destination: str, content_type: str = "application/octet-stream"):
         url = self._parse_url(destination)
         auth = self._get_auth(url)
         
@@ -52,7 +52,8 @@ class RemoteStorage:
             data = await f.read()
         
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.put(url, data=data, auth=auth) as response:
+            headers = {"Content-Type": content_type}
+            async with session.put(url, data=data, auth=auth, headers=headers) as response:
                 response.raise_for_status()
 
     async def get(self, url: str) -> bytes:
@@ -65,11 +66,12 @@ class RemoteStorage:
                 response.raise_for_status()
                 return await response.read()
 
-    async def put(self, data: bytes, destination: str):
+    async def put(self, data: bytes, destination: str, content_type: str = "application/octet-stream"):
         url = self._parse_url(destination)
         auth = self._get_auth(url)
         
         timeout = aiohttp.ClientTimeout(total=self.timeout)
         async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.put(url, data=data, auth=auth) as response:
+            headers = {"Content-Type": content_type}
+            async with session.put(url, data=data, auth=auth, headers=headers) as response:
                 response.raise_for_status()
